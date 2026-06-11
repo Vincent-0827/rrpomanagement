@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地方創生專案辦公室專案管理系統</title>
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入 Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- 引入 SortableJS (加入 defer 避免阻塞) -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Noto Sans TC"', 'sans-serif'] },
+                    colors: {
+                        primary: '#059669', // Emerald 600
+                        secondary: '#10b981', // Emerald 500
+                        dark: '#064e3b', // Emerald 900
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .custom-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+        }
+
+        .accordion-content {
+            transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+        .accordion-content.expanded {
+            max-height: 2000px;
+            opacity: 1;
+        }
+
+        .drag-target-hover {
+            border-color: #10b981 !important;
+            background-color: #ecfdf5 !important;
+        }
+        
+        #sync-indicator {
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans flex h-screen overflow-hidden">
+
+    <div id="mobile-overlay" class="fixed inset-0 bg-gray-800 bg-opacity-50 z-20 hidden lg:hidden" onclick="window.toggleMobileMenu()"></div>
+
+    <!-- 側邊欄 -->
+    <aside id="sidebar" class="bg-dark text-white w-64 flex-shrink-0 flex flex-col transition-transform duration-300 absolute lg:relative z-30 h-full transform -translate-x-full lg:translate-x-0">
+        <div class="p-5 flex items-center justify-between border-b border-gray-700">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-seedling text-2xl text-secondary"></i>
+                <span class="text-lg font-bold tracking-wide">地方創生專辦</span>
+            </div>
+            <button class="lg:hidden text-gray-300 hover:text-white" onclick="window.toggleMobileMenu()">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        
+        <nav class="flex-1 px-4 space-y-2 mt-6 overflow-y-auto">
+            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-4 px-4">核心業務</div>
+            <a href="#" onclick="window.switchView('dashboard')" id="nav-dashboard" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
+                <i class="fa-solid fa-layer-group w-5 text-center"></i>
+                <span>六大工項儀表板</span>
+            </a>
+            <a href="#" onclick="window.switchView('gantt')" id="nav-gantt" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
+                <i class="fa-solid fa-chart-gantt w-5 text-center"></i>
+                <span>細部工項甘特圖</span>
+            </a>
+            <a href="#" onclick="window.switchView('member-tasks')" id="nav-member-tasks" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
+                <i class="fa-solid fa-users-viewfinder w-5 text-center"></i>
+                <span>同仁負責工項</span>
+            </a>
+            
+            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-6 px-4">機動指派</div>
+            <a href="#" onclick="window.switchView('tasks')" id="nav-tasks" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
+                <i class="fa-solid fa-list-check w-5 text-center"></i>
+                <span>交辦事項列表</span>
+            </a>
+            <a href="#" onclick="window.switchView('completed-tasks')" id="nav-completed-tasks" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
+                <i class="fa-solid fa-box-archive w-5 text-center"></i>
+                <span>已結案交辦</span>
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-gray-700 bg-gray-900/50">
+            <div class="flex items-center gap-3 px-2 py-2">
+                <img src="https://ui-avatars.com/api/?name=Admin&background=10b981&color=fff" alt="User" class="w-8 h-8 rounded-full border border-gray-600">
+                <div class="flex-1">
+                    <p class="text-sm font-medium">系統管理員</p>
+                    <p id="sync-indicator" class="text-xs text-emerald-400 opacity-0 transition-opacity"><i class="fa-solid fa-cloud-arrow-up mr-1"></i>已同步至 Google Sheets</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主畫面區塊 -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+        <header class="bg-white shadow-sm z-10 p-4 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <button class="lg:hidden text-gray-600 hover:text-primary focus:outline-none" onclick="window.toggleMobileMenu()">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+                <h2 id="page-title" class="text-xl font-bold text-gray-800 tracking-wide">六大工項儀表板</h2>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-sm font-medium text-emerald-700 bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-100 hidden md:flex items-center gap-2">
+                    <i class="fa-regular fa-clock"></i> 總計畫期程：115/06/11 ~ 116/06/10
+                </div>
+            </div>
+        </header>
+
+        <!-- 若發生錯誤，顯示於此處 -->
+        <div id="error-log" class="hidden m-4 p-4 bg-red-100 text-red-700 rounded-lg border border-red-300 font-medium text-sm"></div>
+
+        <div id="content-container" class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 bg-gray-50/50">
+            <!-- 內容動態載入區 -->
+        </div>
+    </main>
+
+    <!-- 共用 Modal 彈出視窗 -->
+    <div id="customModal" class="fixed inset-0 z-50 hidden items-center justify-center">
+        <div class="absolute inset-0 bg-gray-900 bg-opacity-50 transition-opacity" onclick="window.closeModal()"></div>
+        <div class="bg-white rounded-xl shadow-xl transform transition-all max-w-2xl w-full mx-4 relative z-10 fade-in flex flex-col max-h-[90vh]">
+            <div class="p-6 overflow-y-auto flex-1">
+                <div class="flex items-center justify-center w-12 h-12 mx-auto rounded-full mb-4 flex-shrink-0" id="modalIconContainer">
+                    <i id="modalIcon" class="fa-solid fa-info text-xl text-white"></i>
+                </div>
+                <h3 class="text-lg font-bold text-center text-gray-900 mb-2" id="modalTitle">提示</h3>
+                <div id="modalMessage" class="text-sm text-gray-600 mb-4 text-center"></div>
+                <div id="modalBody" class="w-full"></div>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 rounded-b-xl flex-shrink-0" id="modalActions">
+                <button onclick="window.closeModal()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 邏輯 (支援 Google Sheets 資料庫) -->
+    <script>
+        // 捕獲所有未處理錯誤
+        window.onerror = function(message, source, lineno, colno, error) {
+            const errorLog = document.getElementById('error-log');
+            if (errorLog) {
+                errorLog.classList.remove('hidden');
+                errorLog.innerHTML += `發生錯誤: ${message} (行數: ${lineno})<br>`;
+            }
+        };
+
+        // ==========================================
+        // 1. Google Sheets API 設定 (請在這裡填入您的 Web App URL)
+        // ==========================================
+        window.GOOGLE_SHEETS_API_URL = ""; // ⭐⭐⭐ 請將部署後的 Google Apps Script URL 貼在引號內 ⭐⭐⭐
+
+        // ==========================================
+        // 2. 資料模型與預設值
+        // ==========================================
+        window.colorPalette = [
+            'bg-emerald-100 text-emerald-800 border-emerald-300', 'bg-blue-100 text-blue-800 border-blue-300',
+            'bg-amber-100 text-amber-800 border-amber-300', 'bg-purple-100 text-purple-800 border-purple-300',
+            'bg-pink-100 text-pink-800 border-pink-300', 'bg-teal-100 text-teal-800 border-teal-300',
+            'bg-indigo-100 text-indigo-800 border-indigo-300', 'bg-rose-100 text-rose-800 border-rose-300',
+            'bg-sky-100 text-sky-800 border-sky-300', 'bg-cyan-100 text-cyan-800 border-cyan-300'
+        ];
+        window.taskTypes = ['智庫幕僚', '工項延伸', '網頁更新', '其他'];
+        window.defaultStartDate = '2026-06-11';
+        window.defaultEndDate = '2027-06-10';
+        window.draggedTaskInfo = null;
+        window.currentView = 'dashboard';
+        window.accordionStates = {};
+        window.appInitialized = false;
+
+        // 預設資料 (若 Google Sheets 無資料或未填 URL 時使用)
+        window.teamMembersData = [
+            { name: '黃柏偉', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+            { name: '吳昂臻', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+            { name: '林芷如', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+            { name: '林慈璿', color: 'bg-purple-100 text-purple-800 border-purple-300' },
+            { name: '林經富', color: 'bg-pink-100 text-pink-800 border-pink-300' },
+            { name: '劉韋琪', color: 'bg-teal-100 text-teal-800 border-teal-300' },
+            { name: '廖韋喬', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
+            { name: '林珈卉', color: 'bg-rose-100 text-rose-800 border-rose-300' }
+        ];
+
+        window.otherTasksData = [
+            { id: 'T-001', type: '智庫幕僚', name: '準備第一季跨部會協調會議資料', submitDate: '2026-06-10', startDate: '2026-06-15', endDate: '2026-07-10', members: ['黃柏偉', '林慈璿'], status: '進行中', progress: 30, isOngoing: false },
+            { id: 'T-002', type: '其他', name: '每週例行工作會議報告彙整', submitDate: '2026-06-10', startDate: '2026-06-11', endDate: '2027-06-10', members: ['劉韋琪'], status: '進行中', progress: 0, isOngoing: true },
+            { id: 'T-003', type: '工項延伸', name: '前期測試專案', submitDate: '2026-06-08', startDate: '2026-06-08', endDate: '2026-06-09', members: ['林芷如'], status: '已結案', progress: 100, isOngoing: false } 
+        ];
+
+        window.sixMajorTasksData = [
+            { 
+                id: 'M01', name: '總體政策規劃與行政支援',
+                subTasks: [
+                    { text: '政策研析與論述：研析國內外地方創生政策及案例，指認關鍵議題與策略。', periods: [{ start: '2026-06-11', end: '2026-08-31' }], members: ['黃柏偉', '林芷如'] },
+                    { text: '政策效益評估：滾動檢討計畫績效指標，辦理深度調研並撰寫年度地方創生效益評估報告。', periods: [{ start: '2026-09-01', end: '2027-05-31' }], members: ['林經富'] },
+                    { text: '推動幕僚作業：支援中長程計畫、會報工作會議、跨機關專案協調並維繫各區輔導中心之行政溝通。', periods: [{ start: window.defaultStartDate, end: window.defaultEndDate }], members: ['吳昂臻', '黃柏偉'] },
+                    { text: '諮詢窗口設置：設置專線提供政策與計畫申請諮詢服務，排定專人線上即時解答。', periods: [{ start: window.defaultStartDate, end: window.defaultEndDate }], members: ['劉韋琪'] },
+                    { text: '協助行政事項：配合辦理長官現地視察、簡報製作與彙整、媒體公關等臨時行政交辦事項。', periods: [{ start: window.defaultStartDate, end: window.defaultEndDate }], members: ['廖韋喬'] }
+                ],
+                kpi: [
+                    { text: '政策研析與論述', target: 1, current: 0, unit: '式', isOngoing: false },
+                    { text: '提送地方創生效益評估報告', target: 1, current: 0, unit: '份', isOngoing: false },
+                    { text: '完成各項會報與跨部會工作會議幕僚作業', target: 1, current: 0, unit: '式', isOngoing: false, hideTarget: true }, 
+                    { text: '設置專線提供政策與計畫申請諮詢服務', target: 1, current: 0, unit: '式', isOngoing: true },
+                    { text: '協助行政事項', target: 1, current: 0, unit: '持續', isOngoing: true, hideTarget: true } 
+                ], startDate: window.defaultStartDate, endDate: window.defaultEndDate, status: '進行中'
+            },
+            { 
+                id: 'M02', name: '青年培力工作站補助徵件、培力及管理',
+                subTasks: [
+                    { text: '徵件規劃與執行：研擬須知草案，辦理至少2場說明會及各階段審查(資格/書面/專家/各期報告)。', periods: [{ start: '2026-07-01', end: '2026-10-31' }], members: ['林慈璿', '林珈卉'] },
+                    { text: '團隊能量培力工作坊：辦理至少5場培力課程(講座/工作坊)。', periods: [{ start: '2026-08-01', end: '2027-04-30' }], members: ['吳昂臻'] }, 
+                    { text: '實地調研訪視：辦理30處個案現地訪視 or 調研。', periods: [{ start: '2026-08-01', end: '2027-04-30' }], members: ['吳昂臻'] }, 
+                    { text: '會計帳務輔導與簽證：現地帳務查核(至少70案)、原始支出憑證檢核及會計簽證報告，並辦理帳務處理說明會。', periods: [{ start: '2026-12-01', end: '2027-06-10' }], members: ['林芷如', '廖韋喬'] }
+                ],
+                kpi: [
+                    { text: '辦理徵件說明會', target: 2, current: 0, unit: '場', isOngoing: false },
+                    { text: '辦理培力課程', target: 5, current: 0, unit: '場', isOngoing: false },
+                    { text: '辦理個案現地訪視', target: 30, current: 0, unit: '處', isOngoing: false },
+                    { text: '完成會計帳務查核及簽證', target: 70, current: 0, unit: '案', isOngoing: false }
+                ], startDate: window.defaultStartDate, endDate: window.defaultEndDate, status: '規劃中'
+            },
+            { 
+                id: 'M03', name: '地方創生系列活動策劃及執行',
+                subTasks: [
+                    { text: '地方創生論壇：辦理合計500人次以上論壇(含議題設定、講者邀約與翻譯)。', periods: [{ start: '2026-09-01', end: '2026-11-30' }], members: [] },
+                    { text: '成果展覽及市集：邀請至少60個團隊增加，執行策展企劃與活動安排。', periods: [{ start: '2027-03-01', end: '2027-05-31' }], members: [] },
+                    { text: '活動宣傳及紀實：邀請卡設計、文宣撰寫、宣傳策略及活動紀實整理。', periods: [{ start: '2026-08-01', end: '2027-06-10' }], members: [] },
+                    { text: '行政及經費調度：支應專家出席費及機票、交通、食宿等費用。', periods: [{ start: window.defaultStartDate, end: window.defaultEndDate }], members: [] }
+                ],
+                kpi: [
+                    { text: '辦理地方創生論壇', target: 1, current: 0, unit: '場', isOngoing: false },
+                    { text: '地方創生論壇參與人數', target: 500, current: 0, unit: '人次', isOngoing: false },
+                    { text: '辦理成果展覽及市集', target: 1, current: 0, unit: '場', isOngoing: false },
+                    { text: '邀請參展地方創生團隊', target: 60, current: 0, unit: '團隊', isOngoing: false }
+                ], startDate: window.defaultStartDate, endDate: window.defaultEndDate, status: '規劃中'
+            },
+            { 
+                id: 'M04', name: '國際交流與連結',
+                subTasks: [
+                    { text: '國外參訪交流：協助遴選青年代表(15人)與專家顧問(2人)，辦理6天參訪交流。', periods: [{ start: '2026-09-01', end: '2026-10-31' }], members: ['林經富'] },
+                    { text: '行政聯繫與安排：地點接洽、機票食宿、保證金收退、翻譯及雜支處理. ', periods: [{ start: '2026-07-01', end: '2026-09-30' }], members: ['林經富'] },
+                    { text: '交流成果彙整：彙整青年代表交流心得，並撰寫報告與政策相關建議。', periods: [{ start: '2026-11-01', end: '2026-12-31' }], members: ['黃柏偉'] }
+                ],
+                kpi: [
+                    { text: '完成遴選青年代表', target: 15, current: 0, unit: '名', isOngoing: false },
+                    { text: '邀請專家顧問共同參訪', target: 2, current: 0, unit: '名', isOngoing: false },
+                    { text: '規劃並執行參訪交流行程', target: 6, current: 0, unit: '天', isOngoing: false },
+                    { text: '彙整青年代表交流心得，並撰寫報告與政策相關建議', target: 1, current: 0, unit: '份', isOngoing: false }
+                ], startDate: '2026-09-01', endDate: '2026-10-31', status: '規劃中'
+            },
+            { 
+                id: 'M05', name: '政策推廣與創意廣宣',
+                subTasks: [
+                    { text: '推動事例報導：選取至少20例代表性推動事例，撰寫深度報導並上架。', periods: [{ start: '2026-07-01', end: '2027-05-31' }], members: ['劉韋琪', '林珈卉'] },
+                    { text: '理念短片製作：製作可傳達創心理念之多媒體成果 or 短片(至少5則)。', periods: [{ start: '2026-08-01', end: '2027-04-30' }], members: ['劉韋琪'] }
+                ],
+                kpi: [
+                    { text: '完成深度報導事例', target: 20, current: 0, unit: '例', isOngoing: false },
+                    { text: '產製多媒體短片', target: 5, current: 0, unit: '則', isOngoing: false }
+                ], startDate: window.defaultStartDate, endDate: window.defaultEndDate, status: '規劃中'
+            },
+            { 
+                id: 'M06', name: '計畫管理資訊系統之優化、功能調整及更新維運',
+                subTasks: [
+                    { text: '系統優化與功能調整：開發視覺化圖表、管考欄位調整、報表輸出等。', periods: [{ start: '2026-06-11', end: '2026-12-31' }], members: [] },
+                    { text: '系統維運管理：維護進度追蹤及線上填報系統順暢運行。', periods: [{ start: window.defaultStartDate, end: window.defaultEndDate }], members: [] },
+                    { text: '系統保固：自結案次日起提供1年系統保固。', periods: [{ start: '2027-06-11', end: '2028-06-10' }], members: [] }
+                ],
+                kpi: [
+                    { text: '行政資訊網功能優化', target: 1, current: 0, unit: '式', isOngoing: false },
+                    { text: '行政資訊網更新維運', target: 1, current: 0, unit: '式', isOngoing: true },
+                    { text: '提供結案後系統保固', target: 1, current: 0, unit: '年', isOngoing: false }
+                ], startDate: window.defaultStartDate, endDate: window.defaultEndDate, status: '進行中'
+            }
+        ];
+
+        // ==========================================
+        // 3. Google Sheets 讀取與寫入 (API Fetch)
+        // ==========================================
+        async function initGoogleSheetsDB() {
+            if (!window.GOOGLE_SHEETS_API_URL) {
+                console.warn("https://script.google.com/macros/s/AKfycbw8RDAIMtmB23voJqvdfTqNXFjqwGPsPpd1KyL6u8_VE7ykuO8XpMkuh1Y_UnzN6tU/exec");
+                if(!window.appInitialized) { window.appInitialized = true; window.initApp(); }
+                return;
+            }
+            try {
+                // 從 Google Sheets 獲取資料
+                const response = await fetch(window.GOOGLE_SHEETS_API_URL);
+                const result = await response.json();
+                
+                if (result.status === "success" && result.data) {
+                    // 若試算表內有資料，解析並覆蓋本地預設資料
+                    const dbData = JSON.parse(result.data);
+                    if (dbData.teamMembersData) window.teamMembersData = dbData.teamMembersData;
+                    if (dbData.otherTasksData) window.otherTasksData = dbData.otherTasksData;
+                    if (dbData.sixMajorTasksData) window.sixMajorTasksData = dbData.sixMajorTasksData;
+                    console.log("成功從 Google Sheets 載入資料");
+                }
+            } catch (e) {
+                console.error("讀取 Google Sheets 失敗，使用預設資料:", e);
+            } finally {
+                if(!window.appInitialized) { window.appInitialized = true; window.initApp(); }
+            }
+        }
+
+        window.syncDataToGoogleSheets = async function() {
+            if (!window.GOOGLE_SHEETS_API_URL) return;
+            
+            const payload = {
+                teamMembersData: window.teamMembersData,
+                otherTasksData: window.otherTasksData,
+                sixMajorTasksData: window.sixMajorTasksData
+            };
+
+            try {
+                const indicator = document.getElementById('sync-indicator');
+                if (indicator) {
+                    indicator.classList.remove('opacity-0');
+                    indicator.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>同步中...';
+                }
+
+                // 使用 POST 傳送資料，設定 Content-Type 為 text/plain 以避免 CORS preflight 問題
+                await fetch(window.GOOGLE_SHEETS_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (indicator) {
+                    indicator.innerHTML = '<i class="fa-solid fa-cloud-arrow-up mr-1 text-emerald-400"></i>已同步至 Google Sheets';
+                    setTimeout(() => indicator.classList.add('opacity-0'), 2000);
+                }
+            } catch(e) { 
+                console.error("同步至 Google Sheets 錯誤:", e); 
+                const indicator = document.getElementById('sync-indicator');
+                if (indicator) {
+                    indicator.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1 text-red-500"></i>同步失敗';
+                }
+            }
+        };
+
+        // ==========================================
+        // 4. 視圖渲染輔助工具與核心功能
+        // ==========================================
+        window.calculateMajorTaskProgress = function(task) {
+            if (!task.kpi || task.kpi.length === 0) return 0;
+            let total = 0, count = 0;
+            task.kpi.forEach(k => {
+                if (!k.isOngoing) {
+                    let p = k.target > 0 ? (k.current / k.target) * 100 : 0;
+                    total += Math.min(p, 100); 
+                    count++;
+                }
+            });
+            if (count === 0) return '持續進行';
+            return Math.round(total / count);
+        }
+
+        window.toggleAccordion = function(index) {
+            const content = document.getElementById('content-' + index), icon = document.getElementById('icon-' + index);
+            var isExpanded = content.classList.contains('expanded');
+            if (isExpanded) {
+                content.classList.remove('expanded');
+                icon.classList.remove('rotate-180');
+            } else {
+                content.classList.add('expanded');
+                icon.classList.add('rotate-180');
+            }
+            window.accordionStates[index] = !isExpanded;
+        }
+
+        window.getStatusBadge = function(status) {
+            let colorClass = '';
+            switch(status) {
+                case '進行中': colorClass = 'bg-blue-100 text-blue-700 border-blue-200'; break;
+                case '已結案': colorClass = 'bg-emerald-100 text-emerald-700 border-emerald-200'; break;
+                case '規劃中': colorClass = 'bg-amber-100 text-amber-700 border-amber-200'; break;
+                default: colorClass = 'bg-gray-100 text-gray-700 border-gray-200';
+            }
+            return `<span class="px-3 py-1 rounded-full text-xs font-medium border shadow-sm ${colorClass}">${status}</span>`;
+        }
+
+        window.getToday = function() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        window.reorderTasksByDOM = function(tbodyElement, filterFn) {
+            const rows = tbodyElement.querySelectorAll('tr[data-task-id]');
+            const newIdOrder = Array.from(rows).map(r => r.getAttribute('data-task-id'));
+            const matchingTasks = window.otherTasksData.filter(filterFn);
+            matchingTasks.sort((a, b) => newIdOrder.indexOf(a.id) - newIdOrder.indexOf(b.id));
+            let matchingIdx = 0;
+            window.otherTasksData = window.otherTasksData.map(t => {
+                if (filterFn(t)) return matchingTasks[matchingIdx++];
+                return t;
+            });
+            window.syncDataToGoogleSheets(); // 更新順序至雲端
+        }
+
+        // ==========================================
+        // 5. 核心視圖元件渲染
+        // ==========================================
+        function renderDashboard(container) {
+            let accordionHtml = '';
+            window.sixMajorTasksData.forEach((task, index) => {
+                let subTasksHtml = task.subTasks.map(sub => {
+                    let membersTag = '';
+                    if (sub.members && sub.members.length > 0) {
+                        let primary = sub.members[0].slice(-2);
+                        let co = sub.members.slice(1).map(m => m.slice(-2)).join(', ');
+                        let primaryObj = window.teamMembersData.find(m => m.name === sub.members[0]);
+                        let primaryBg = primaryObj ? primaryObj.color.split(' ')[0] : 'bg-blue-50';
+                        let primaryText = primaryObj ? primaryObj.color.split(' ')[1] : 'text-blue-700';
+                        membersTag = `<div class="mt-2 flex gap-2 pl-6 items-center"><span class="inline-block px-2 py-0.5 ${primaryBg} ${primaryText} border border-blue-200 rounded text-xs font-bold whitespace-nowrap shadow-sm">主責: ${primary}</span>${co ? `<span class="inline-block px-2 py-0.5 bg-gray-100 text-gray-600 border border-gray-200 rounded text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title="協辦: ${co}">協辦: ${co}</span>` : ''}</div>`;
+                    } else {
+                        membersTag = `<div class="mt-2 pl-6"><span class="inline-block px-2 py-0.5 bg-red-50 text-red-500 border border-red-100 rounded text-xs">尚未指派同仁</span></div>`;
+                    }
+                    return `<li class="text-sm text-gray-600 flex flex-col leading-relaxed pb-3 border-b border-gray-100 last:border-0 last:pb-0"><div class="flex items-start gap-2 w-full"><i class="fa-solid fa-caret-right text-emerald-400 mt-1 flex-shrink-0"></i><span class="flex-1">${sub.text}</span></div>${membersTag}</li>`;
+                }).join('');
+
+                let kpiHtml = task.kpi.map((kpiItem, kpiIndex) => {
+                    let percent = kpiItem.target > 0 ? Math.round((kpiItem.current / kpiItem.target) * 100) : 0;
+                    let percentDisplayHtml = kpiItem.isOngoing 
+                        ? `<span id="kpi-percent-${index}-${kpiIndex}" class="ml-auto font-bold text-orange-600">達成率: 持續進行</span>`
+                        : `<span id="kpi-percent-${index}-${kpiIndex}" class="ml-auto font-bold ${percent >= 100 ? 'text-emerald-600' : 'text-orange-600'}">達成率: ${percent}%</span>`;
+                    let targetDisplay = kpiItem.hideTarget ? '' : ` (目標: ${kpiItem.target}${kpiItem.unit})`;
+
+                    return `
+                        <li class="mb-3 p-3 bg-orange-50/40 rounded-lg border border-orange-100 shadow-sm transition-all hover:bg-orange-50/80">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="text-sm font-medium text-gray-800"><i class="fa-solid fa-circle-dot text-[10px] text-orange-400 mr-1.5"></i>${kpiItem.text}${targetDisplay}</div>
+                                <label class="flex items-center gap-1 cursor-pointer ml-2 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-200 hover:bg-blue-50 transition-colors">
+                                    <input type="checkbox" class="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" ${kpiItem.isOngoing ? 'checked' : ''} onchange="window.toggleKpiOngoing(${index}, ${kpiIndex}, this.checked)">
+                                    <span class="text-xs font-bold text-blue-700 whitespace-nowrap">持續進行</span>
+                                </label>
+                            </div>
+                            <div id="kpi-container-${index}-${kpiIndex}" class="flex items-center gap-2 text-sm mt-2 ${kpiItem.isOngoing ? 'opacity-40 pointer-events-none' : ''}">
+                                <span class="text-gray-600">目前已完成:</span>
+                                <input type="number" min="0" value="${kpiItem.current}" id="kpi-input-${index}-${kpiIndex}" ${kpiItem.isOngoing ? 'disabled' : ''} class="w-16 px-2 py-1 text-sm border border-gray-300 rounded text-center focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 transition-shadow" oninput="window.updateKpi(${index}, ${kpiIndex}, this)">
+                                <span class="text-gray-600">${kpiItem.unit}</span>
+                                ${percentDisplayHtml}
+                            </div>
+                            <div id="kpi-bar-container-${index}-${kpiIndex}" class="w-full bg-orange-100/70 rounded-full h-1.5 mt-2.5 overflow-hidden ${kpiItem.isOngoing ? 'hidden' : ''}">
+                                <div id="kpi-bar-${index}-${kpiIndex}" class="bg-orange-500 h-1.5 rounded-full transition-all duration-300" style="width: ${Math.min(percent, 100)}%"></div>
+                            </div>
+                        </li>
+                    `;
+                }).join('');
+
+                let majorProgressVal = window.calculateMajorTaskProgress(task);
+                let majorProgressDisplay = majorProgressVal === '持續進行' ? '持續進行' : majorProgressVal + '%';
+                var isExpanded = window.accordionStates[index] || false;
+
+                accordionHtml += `
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-4">
+                        <div class="p-5 cursor-pointer hover:bg-gray-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4" onclick="window.toggleAccordion(${index})">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold flex-shrink-0">0${index + 1}</div>
+                                <div>
+                                    <h4 class="font-bold text-gray-800 text-lg leading-tight">${task.name}</h4>
+                                    <div class="text-xs text-gray-500 mt-2 flex flex-wrap items-center gap-3">
+                                        <span class="flex items-center"><i class="fa-regular fa-calendar mr-1"></i> ${task.startDate} ~ ${task.endDate}</span>
+                                        <span id="major-status-${index}">${window.getStatusBadge(task.status)}</span>
+                                        <span id="major-progress-${index}" class="font-medium ${majorProgressVal === '持續進行' ? 'text-blue-600' : 'text-emerald-600'}">總體進度: ${majorProgressDisplay}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 self-end sm:self-center"><i class="fa-solid fa-chevron-down text-gray-400 transform transition-transform duration-300 ml-2 ${isExpanded ? 'rotate-180' : ''}" id="icon-${index}"></i></div>
+                        </div>
+                        <div class="accordion-content bg-gray-50/80 border-t border-gray-100 ${isExpanded ? 'expanded' : ''}" id="content-${index}">
+                            <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div class="bg-white p-5 rounded-lg border border-gray-100 shadow-sm"><h5 class="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-list-check text-emerald-600"></i> 細部工作內容與指派狀況</h5><ul class="space-y-3">${subTasksHtml}</ul></div>
+                                <div class="flex flex-col"><div class="bg-white p-5 rounded-lg border border-orange-100 shadow-sm h-full"><h5 class="text-sm font-bold text-orange-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-bullseye"></i> 年度目標 KPI</h5><ul class="list-none m-0 p-0">${kpiHtml}</ul></div></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = `<div class="mb-6 bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between"><div><h3 class="text-lg font-bold text-emerald-800 mb-1"><i class="fa-solid fa-flag-checkered mr-2"></i>115年度委託辦理六大核心工作項目</h3><p class="text-sm text-gray-500">依據需求書規範之六大工項，展開細部工作內容與年度 KPI。點擊卡片可展開檢視細節，並由 KPI 達成率自動計算整體進度。</p></div></div><div class="space-y-4" id="accordion-container">${accordionHtml}</div>`;
+        }
+
+        function renderGantt(container) {
+            const projStart = new Date('2026-06-01').getTime(), projEnd = new Date('2027-06-30').getTime(), totalMs = projEnd - projStart;
+            let html = `<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col" style="min-height: calc(100vh - 120px);"><h3 class="text-lg font-bold text-emerald-800 mb-4"><i class="fa-solid fa-chart-gantt mr-2"></i>細部工作項目排程與指派 (甘特圖)</h3><div class="flex-1 overflow-auto relative rounded-lg border border-gray-200 shadow-inner"><div class="min-w-[1200px] relative">`;
+            html += `<div class="flex border-b border-gray-200 bg-gray-100 sticky top-0 z-30 shadow-sm"><div class="w-[380px] flex-shrink-0 p-3 font-bold text-gray-700 border-r border-gray-200 bg-gray-100">核心工項與細部項目</div><div class="flex-1 relative h-12">`;
+            const months = ['115/06', '07', '08', '09', '10', '11', '12', '116/01', '02', '03', '04', '05', '06'];
+            months.forEach((m, i) => { html += `<div class="absolute top-0 bottom-0 border-l border-gray-300 px-2 py-3 text-xs font-bold text-gray-600 bg-gray-100/80" style="left: ${(i/13)*100}%; width: ${100/13}%">${m}</div>`; });
+            html += `</div></div>`;
+
+            const milestonesData = [{ date: '2026-07-10', label: '115/7/10(五) 提交期初報告書' }, { date: '2026-12-10', label: '115/12/10(四) 提交期中報告書' }, { date: '2027-05-10', label: '116/5/10(一) 提交期末報告書' }];
+            let milestonesHtml = `<div class="absolute top-0 bottom-0 left-[380px] right-0 pointer-events-none z-20 overflow-hidden">`;
+            milestonesData.forEach((ms, i) => {
+                let msTime = new Date(ms.date).getTime();
+                let leftPercent = ((msTime - projStart) / totalMs) * 100;
+                milestonesHtml += `<div class="absolute top-0 bottom-0 border-l-2 border-red-500/40 border-dashed" style="left: ${leftPercent}%;"><div class="bg-red-50 border border-red-200 text-red-700 text-[11px] font-bold px-2 py-1 rounded-md shadow-md absolute -translate-x-1/2 whitespace-nowrap pointer-events-auto" style="top: ${60 + (i * 32)}px;"><i class="fa-solid fa-flag text-red-500 mr-1"></i>${ms.label}</div></div>`;
+            });
+            milestonesHtml += `</div>`;
+            html += milestonesHtml;
+
+            window.sixMajorTasksData.forEach((task, mIndex) => {
+                html += `<div class="flex border-b border-gray-200 bg-emerald-50/60 sticky left-0 z-10"><div class="w-[380px] flex-shrink-0 p-3 font-bold text-emerald-800 text-sm border-r border-emerald-100 truncate" title="${task.name}">${task.name}</div><div class="flex-1 relative h-10"></div></div>`;
+                task.subTasks.forEach((sub, sIndex) => {
+                    let memberBadge = '';
+                    if(sub.members && sub.members.length > 0) {
+                        let nameShort = sub.members[0].slice(-2);
+                        memberBadge = `<div class="text-[10px] text-blue-600 font-bold mt-1 bg-blue-50 inline-block px-1.5 rounded">主責: ${nameShort}</div>`;
+                    }
+                    html += `<div class="flex border-b border-gray-100 hover:bg-gray-50 transition-colors group"><div class="w-[380px] flex-shrink-0 p-3 text-sm text-gray-700 border-r border-gray-200 pr-10 relative bg-white group-hover:bg-gray-50 z-10"><div class="truncate text-xs leading-relaxed" title="${sub.text}"><i class="fa-solid fa-angle-right text-gray-300 mr-1"></i> ${sub.text.split('：')[0]}</div>${memberBadge}<button onclick="window.openGanttEditModal(${mIndex}, ${sIndex})" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 rounded px-1.5 py-1 border border-gray-200 shadow-sm pointer-events-auto" title="編輯排程區間與指派同仁"><i class="fa-solid fa-pen-to-square"></i> 設定</button></div><div class="flex-1 relative h-[52px] py-2">`;
+                    months.forEach((m, i) => { html += `<div class="absolute top-0 bottom-0 border-l border-gray-100 border-dashed pointer-events-none" style="left: ${(i/13)*100}%; width: ${100/13}%"></div>`; });
+                    sub.periods.forEach(p => {
+                        let sTime = Math.max(new Date(p.start).getTime(), projStart), eTime = Math.min(new Date(p.end).getTime() + 86400000, projEnd);
+                        if (sTime <= eTime) {
+                            html += `<div class="absolute top-2.5 bottom-2.5 bg-emerald-500 rounded-md shadow-sm border border-emerald-600 opacity-80 hover:opacity-100 hover:shadow-md transition-all cursor-pointer group/bar flex items-center justify-center overflow-hidden" style="left: ${((sTime - projStart) / totalMs) * 100}%; width: ${((eTime - sTime) / totalMs) * 100}%; min-width: 6px;" title="排程區間：${p.start} ~ ${p.end}"></div>`;
+                        }
+                    });
+                    html += `</div></div>`;
+                });
+            });
+            html += `</div></div></div>`;
+            container.innerHTML = html;
+        }
+
+        function renderMemberTasks(container) {
+            let memberCardsHtml = '';
+            window.teamMembersData.forEach((member, mIdx) => {
+                let memberMajorTasks = [];
+                window.sixMajorTasksData.forEach((major, majorIdx) => {
+                    major.subTasks.forEach((sub, subIdx) => {
+                        if (sub.members && sub.members.includes(member.name)) {
+                            memberMajorTasks.push({ majorIdx: majorIdx, subIdx: subIdx, majorName: major.name, subText: sub.text, isPrimary: sub.members[0] === member.name });
+                        }
+                    });
+                });
+                memberMajorTasks.sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
+
+                let memberOtherTasks = [];
+                window.otherTasksData.forEach((ot, otIdx) => {
+                    if (ot.members && ot.members.includes(member.name)) {
+                        memberOtherTasks.push({ otIdx: otIdx, name: ot.name, startDate: ot.startDate, endDate: ot.endDate, isPrimary: ot.members[0] === member.name, status: ot.status });
+                    }
+                });
+                memberOtherTasks.sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
+
+                let avatarName = member.name.slice(-2);
+                let taskListHtml = '';
+                if (memberMajorTasks.length === 0 && memberOtherTasks.length === 0) {
+                    taskListHtml = `<div class="text-center text-xs text-gray-400 py-10 bg-gray-50/50 rounded-lg border border-dashed border-gray-200">可拖曳任務至此</div>`;
+                } else {
+                    if (memberMajorTasks.length > 0) {
+                        taskListHtml += `<h5 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">六大核心 - 細部工項</h5>`;
+                        memberMajorTasks.forEach(t => {
+                            let roleBadge = t.isPrimary ? `<span class="bg-blue-100 text-blue-700 px-1 py-0.5 rounded text-[10px] font-bold shadow-sm">主責</span>` : `<span class="bg-gray-100 text-gray-600 px-1 py-0.5 rounded text-[10px] font-bold border border-gray-200">協辦</span>`;
+                            taskListHtml += `
+                                <div class="bg-white p-2.5 rounded border border-gray-200 shadow-sm cursor-grab active:cursor-grabbing mb-2 hover:border-emerald-500 transition-all text-xs" draggable="true" ondragstart="window.handleCardDragStart(event, 'major', ${t.majorIdx}, ${t.subIdx}, '${member.name}')">
+                                    <div class="text-[10px] font-bold text-emerald-700 mb-1 truncate">${t.majorName}</div><div class="text-gray-700 leading-snug font-medium line-clamp-2">${t.subText.split('：')[0]}</div><div class="mt-2 flex justify-between items-center">${roleBadge}<span class="text-[9px] text-gray-400"><i class="fa-solid fa-arrows-alt-h mr-0.5"></i>拖曳指派</span></div>
+                                </div>`;
+                        });
+                    }
+                    if (memberOtherTasks.length > 0) {
+                        taskListHtml += `<h5 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4">機動與其他交辦</h5>`;
+                        memberOtherTasks.forEach(t => {
+                            let roleBadge = t.isPrimary ? `<span class="bg-blue-100 text-blue-700 px-1 py-0.5 rounded text-[10px] font-bold shadow-sm">主責</span>` : `<span class="bg-gray-100 text-gray-600 px-1 py-0.5 rounded text-[10px] font-bold border border-gray-200">協辦</span>`;
+                            taskListHtml += `
+                                <div class="bg-white p-2.5 rounded border border-gray-200 shadow-sm cursor-grab active:cursor-grabbing mb-2 hover:border-emerald-500 transition-all text-xs" draggable="true" ondragstart="window.handleCardDragStart(event, 'other', ${t.otIdx}, -1, '${member.name}')">
+                                    <div class="text-gray-700 font-bold leading-snug line-clamp-2 mb-1">${t.name}</div><div class="text-[10px] text-gray-400"><i class="fa-regular fa-calendar mr-1"></i>${t.startDate} ~ ${t.endDate}</div><div class="mt-2 flex justify-between items-center">${roleBadge}<span class="text-[9px] text-gray-400"><i class="fa-solid fa-arrows-alt-h mr-0.5"></i>拖曳指派</span></div>
+                                </div>`;
+                        });
+                    }
+                }
+
+                memberCardsHtml += `
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[480px] transition-all" ondragover="window.handleCardDragOver(event)" ondragleave="window.handleCardDragLeave(event)" ondrop="window.handleCardDrop(event, '${member.name}')">
+                        <div class="p-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-xs font-bold shadow-sm ${member.color.split(' ')[0]} ${member.color.split(' ')[1]}">${avatarName}</span><div><h4 class="font-bold text-gray-800 text-sm">${avatarName}</h4></div></div>
+                            <div class="flex gap-1"><button onclick="window.openEditMemberModal(${mIdx})" class="p-1 text-gray-400 hover:text-blue-600 transition-colors text-xs" title="編輯同仁姓名"><i class="fa-solid fa-pen-to-square"></i></button><button onclick="window.confirmRemoveMember(${mIdx})" class="p-1 text-gray-400 hover:text-red-600 transition-colors text-xs" title="移除此同仁"><i class="fa-solid fa-trash-can"></i></button></div>
+                        </div><div class="p-3 overflow-y-auto flex-1 bg-gray-50/30 space-y-1">${taskListHtml}</div>
+                    </div>`;
+            });
+
+            container.innerHTML = `<div class="mb-6 bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between"><div><h3 class="text-lg font-bold text-emerald-800 mb-1"><i class="fa-solid fa-users-viewfinder mr-2"></i>同仁負責工項看板與分派</h3><p class="text-sm text-gray-500">這裡僅呈現同仁的「姓名簡稱」並以專屬色區隔。<strong>您可以直接按住卡片「拖曳」到別的同仁身上</strong>，即可在不同成員間即時進行指派與重新分派。</p></div><button onclick="window.openAddMemberModal()" class="bg-primary hover:bg-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2 flex-shrink-0"><i class="fa-solid fa-user-plus"></i> 新增同仁</button></div><div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="member-board">${memberCardsHtml}</div>`;
+        }
+
+        function renderOtherTasks(container) {
+            const activeTasks = window.otherTasksData.filter(t => t.progress < 100 && !t.isOngoing);
+            const ongoingTasks = window.otherTasksData.filter(t => t.isOngoing);
+            const allDisplayedTasks = [...ongoingTasks, ...activeTasks];
+
+            let tableRows = allDisplayedTasks.length === 0 ? `<tr><td colspan="6" class="text-center py-8 text-gray-500">目前尚無進行中的機動交辦</td></tr>` : 
+                allDisplayedTasks.map(t => `<tr class="hover:bg-emerald-50/30 transition-colors" data-task-id="${t.id}">
+                    <td class="px-6 py-4"><span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs border">${t.type}</span></td>
+                    <td class="px-6 py-4 max-w-[250px] truncate"><div class="font-medium text-gray-800" title="${t.name}">${t.name}</div></td>
+                    <td class="px-6 py-4"><div class="text-sm text-gray-700">${t.startDate} ~ ${t.endDate}</div></td>
+                    <td class="px-6 py-4"><select class="w-full border rounded px-2 py-1 text-sm bg-white custom-select"><option disabled selected>人員 (${t.members.length})</option>${t.members.map((m, i) => `<option value="${m}">${i===0 ? '主責: ': '協辦: '}${m.slice(-2)}</option>`).join('')}</select></td>
+                    <td class="px-6 py-4 text-center"><div class="text-sm font-bold text-gray-700 mb-1">${t.isOngoing ? '<span class="text-blue-600">持續進行</span>' : t.progress+'%'}</div>${window.getStatusBadge(t.status)}</td>
+                    <td class="px-6 py-4 text-center"><div class="flex justify-center gap-1.5"><button class="cursor-move p-1.5 text-gray-400 hover:text-gray-700 rounded" title="拖曳排序"><i class="fa-solid fa-grip-vertical"></i></button><button class="p-1.5 text-blue-600 hover:bg-blue-100 rounded" onclick="window.openEditOtherTaskModal('${t.id}')"><i class="fa-solid fa-pen"></i></button><button class="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded" onclick="window.openProgressModal('${t.id}')"><i class="fa-solid fa-bars-progress"></i></button><button class="p-1.5 text-red-600 hover:bg-red-100 rounded" onclick="window.confirmDeleteOther('${t.id}')"><i class="fa-solid fa-trash"></i></button></div></td>
+                </tr>`).join('');
+
+            container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><div class="p-4 border-b flex justify-between items-center bg-gray-50/50"><div><h3 class="font-bold text-gray-700">交辦事項列表</h3><p class="text-xs text-gray-500 mt-1">提示：可按住最右側的 <i class="fa-solid fa-grip-vertical mx-1"></i> 圖示上下拖曳調整排序。</p></div><div class="flex gap-2"><button onclick="window.switchView('export-tasks')" class="border bg-white hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium shadow-sm"><i class="fa-solid fa-print"></i> 匯出報表</button><button onclick="window.switchView('add-task')" class="bg-primary hover:bg-dark text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm"><i class="fa-solid fa-plus"></i> 新增交辦</button></div></div><div class="overflow-x-auto"><table class="w-full text-left border-collapse whitespace-nowrap"><thead class="bg-gray-50 text-gray-600 text-sm"><tr><th class="px-6 py-4 border-b">交辦類型</th><th class="px-6 py-4 border-b max-w-[250px]">交辦事項</th><th class="px-6 py-4 border-b">排程 (起訖)</th><th class="px-6 py-4 border-b w-48">指派人員</th><th class="px-6 py-4 border-b text-center">進度/狀態</th><th class="px-6 py-4 border-b text-center">操作</th></tr></thead><tbody id="sortable-task-list" class="divide-y divide-gray-100">${tableRows}</tbody></table></div></div>`;
+            window.initSortable();
+        }
+
+        function renderAddOtherTask(container) { container.innerHTML = window.generateTaskFormHtml('add'); }
+
+        function renderCompletedTasks(container) {
+            const completedTasks = window.otherTasksData.filter(t => t.progress === 100 && !t.isOngoing);
+            const stats = {}; completedTasks.forEach(t => stats[t.type] = (stats[t.type] || 0) + 1);
+            let statsHtml = window.taskTypes.map(type => `<div class="bg-emerald-50 rounded-lg p-3 text-center border border-emerald-100"><div class="text-xs text-emerald-600 font-bold">${type}</div><div class="text-xl font-bold text-emerald-800">${stats[type] || 0}</div></div>`).join('');
+            
+            let tableRows = completedTasks.length === 0 ? `<tr><td colspan="6" class="text-center py-8 text-gray-500">目前尚無已結案的交辦事項</td></tr>` : 
+                completedTasks.map((t, i) => `<tr class="hover:bg-gray-50" data-task-id="${t.id}">
+                    <td class="px-6 py-4 text-sm text-gray-500">${i + 1}</td>
+                    <td class="px-6 py-4 text-sm">${t.submitDate}</td>
+                    <td class="px-6 py-4"><span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs border">${t.type}</span></td>
+                    <td class="px-6 py-4 font-medium max-w-[250px] truncate" title="${t.name}">${t.name}</td>
+                    <td class="px-6 py-4"><select class="w-full border rounded px-2 py-1 text-sm bg-white custom-select"><option disabled selected>人員 (${t.members.length})</option>${t.members.map((m, idx) => `<option value="${m}">${idx===0 ? '主責: ': '協辦: '}${m.slice(-2)}</option>`).join('')}</select></td>
+                    <td class="px-6 py-4 text-center"><div class="flex justify-center gap-1.5"><button class="cursor-move p-1.5 text-gray-400 hover:text-gray-700 rounded" title="拖曳排序"><i class="fa-solid fa-grip-vertical"></i></button><button class="p-1.5 text-blue-600 hover:bg-blue-100 rounded" onclick="window.openEditOtherTaskModal('${t.id}')" title="編輯交辦內容"><i class="fa-solid fa-pen"></i></button><button class="p-1.5 text-red-600 hover:bg-red-100 rounded" onclick="window.confirmDeleteOther('${t.id}')" title="刪除項目"><i class="fa-solid fa-trash"></i></button></div></td>
+                </tr>`).join('');
+            
+            container.innerHTML = `<div class="mb-6 bg-white p-6 rounded-xl border shadow-sm"><div class="flex justify-between items-center mb-4"><div class="flex items-center gap-3"><h3 class="text-lg font-bold text-emerald-800"><i class="fa-solid fa-box-archive mr-2"></i>已結案交辦總覽</h3><span class="bg-emerald-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-sm">總計：${completedTasks.length} 件</span></div><button onclick="window.exportCompletedToExcel()" class="bg-white border hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium shadow-sm"><i class="fa-solid fa-print"></i> 匯出報表</button></div><div class="grid grid-cols-2 md:grid-cols-4 gap-4">${statsHtml}</div></div><div class="bg-white rounded-xl shadow-sm border overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-left border-collapse whitespace-nowrap"><thead class="bg-gray-50 text-gray-600 text-sm"><tr><th class="px-6 py-4 border-b w-16">序</th><th class="px-6 py-4 border-b w-32">提交日期</th><th class="px-6 py-4 border-b w-32">交辦類型</th><th class="px-6 py-4 border-b">交辦事項</th><th class="px-6 py-4 border-b w-48">指派人員</th><th class="px-6 py-4 border-b text-center">操作</th></tr></thead><tbody id="sortable-completed-list" class="divide-y divide-gray-100">${tableRows}</tbody></table></div></div>`;
+            window.initSortableCompleted();
+        }
+
+        function renderExportTasks(container) {
+            const activeTasks = window.otherTasksData.filter(t => t.progress < 100 || t.isOngoing).sort((a,b) => new Date(a.submitDate) - new Date(b.submitDate));
+            let tableRows = activeTasks.map((t, i) => `<tr class="hover:bg-blue-50/50 group"><td class="px-4 py-2 border text-center text-gray-600 bg-gray-50">${i + 1}</td><td class="px-4 py-2 border outline-none focus:bg-yellow-50" contenteditable="true">${t.submitDate}</td><td class="px-4 py-2 border outline-none focus:bg-yellow-50" contenteditable="true">${t.type}</td><td class="px-4 py-2 border outline-none focus:bg-yellow-50" contenteditable="true">${t.name}</td><td class="px-2 py-2 border text-center w-10"><button onclick="this.closest('tr').remove()" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100" title="刪除此列"><i class="fa-solid fa-xmark"></i></button></td></tr>`).join('');
+            container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border flex flex-col h-full"><div class="p-4 border-b flex justify-between items-center bg-blue-50/50"><div><h3 class="font-bold text-blue-800"><i class="fa-solid fa-file-export mr-1"></i> 匯出交辦列表 (報表編輯模式)</h3><p class="text-xs text-gray-500 mt-1">預覽畫面：可點擊文字修改或刪除資料列，完成後即可全選複製。</p></div><button onclick="window.switchView('tasks')" class="bg-white border hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium shadow-sm">返回列表</button></div><div class="p-6 overflow-auto flex-1 bg-gray-100"><div class="bg-white p-8 shadow-sm border max-w-4xl mx-auto"><h2 class="text-xl font-bold text-center mb-6" contenteditable="true">地方創生專案辦公室 - 交辦事項列表</h2><table class="w-full text-left border-collapse border text-sm"><thead class="bg-gray-100"><tr><th class="px-4 py-2 border text-center w-16">序</th><th class="px-4 py-2 border w-32">提交日期</th><th class="px-4 py-2 border w-32">交辦類型</th><th class="px-4 py-2 border">交辦事項</th><th class="w-10 border bg-white"></th></tr></thead><tbody>${tableRows}</tbody></table></div></div></div>`;
+        }
+
+        // ==========================================
+        // 6. 事件表單核心交互處理 (含 Google Sheets 同步)
+        // ==========================================
+        window.openCustomModal = function(title, msgHtml, type, bodyHtml, actionsHtml) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerHTML = msgHtml || '';
+            document.getElementById('modalBody').innerHTML = bodyHtml || '';
+            const icon = document.getElementById('modalIcon'), iconC = document.getElementById('modalIconContainer');
+            let bgClass = '', iconClass = '';
+            if (type === 'info') { iconClass = 'fa-pen-to-square'; bgClass = 'bg-blue-500 shadow-blue-200'; }
+            else if (type === 'success') { iconClass = 'fa-check'; bgClass = 'bg-emerald-500 shadow-emerald-200'; }
+            else if (type === 'danger') { iconClass = 'fa-triangle-exclamation'; bgClass = 'bg-red-500 shadow-red-200'; }
+            else if (type === 'warning') { iconClass = 'fa-triangle-exclamation'; bgClass = 'bg-amber-500 shadow-amber-200'; }
+            if (icon && iconC) { icon.className = `fa-solid ${iconClass} text-xl text-white`; iconC.className = `flex items-center justify-center w-12 h-12 mx-auto rounded-full mb-4 shadow-md flex-shrink-0 ${bgClass}`; }
+            const actionsContainer = document.getElementById('modalActions');
+            if (actionsContainer) { actionsContainer.innerHTML = actionsHtml || `<button onclick="window.closeModal()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">關閉</button>`; }
+            const modal = document.getElementById('customModal');
+            if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+        }
+
+        window.closeModal = function() {
+            const modal = document.getElementById('customModal');
+            if (modal) { modal.classList.remove('flex'); modal.classList.add('hidden'); }
+        }
+
+        window.toggleKpiOngoing = function(taskIndex, kpiIndex, isOngoing) {
+            window.sixMajorTasksData[taskIndex].kpi[kpiIndex].isOngoing = isOngoing;
+            window.syncDataToGoogleSheets();
+            renderDashboard(document.getElementById('content-container'));
+        }
+
+        window.updateKpi = function(taskIndex, kpiIndex, inputElement) {
+            let val = parseInt(inputElement.value, 10) || 0;
+            if (val < 0) { val = 0; inputElement.value = 0; }
+            let task = window.sixMajorTasksData[taskIndex];
+            task.kpi[kpiIndex].current = val;
+            
+            let percent = task.kpi[kpiIndex].target > 0 ? Math.round((val / task.kpi[kpiIndex].target) * 100) : 0;
+            let percentSpan = document.getElementById(`kpi-percent-${taskIndex}-${kpiIndex}`);
+            let barDiv = document.getElementById(`kpi-bar-${taskIndex}-${kpiIndex}`);
+            
+            if (task.kpi[kpiIndex].isOngoing) {
+                if (percentSpan) { percentSpan.innerText = `達成率: 持續進行`; percentSpan.className = `ml-auto font-bold text-orange-600`; }
+            } else {
+                if (percentSpan) { percentSpan.innerText = `達成率: ${percent}%`; percentSpan.className = `ml-auto font-bold ${percent >= 100 ? 'text-emerald-600' : 'text-orange-600'}`; }
+                if (barDiv) barDiv.style.width = `${Math.min(percent, 100)}%`;
+            }
+
+            let newMajorProgress = window.calculateMajorTaskProgress(task);
+            let majorProgSpan = document.getElementById(`major-progress-${taskIndex}`);
+            if (majorProgSpan) {
+                majorProgSpan.innerText = newMajorProgress === '持續進行' ? `總體進度: 持續進行` : `總體進度: ${newMajorProgress}%`;
+                majorProgSpan.className = `font-medium ${newMajorProgress === '持續進行' ? 'text-blue-600' : 'text-emerald-600'}`;
+            }
+
+            task.status = newMajorProgress === '持續進行' ? '進行中' : (newMajorProgress >= 100 ? '已結案' : (newMajorProgress > 0 ? '進行中' : '規劃中'));
+            let statusSpan = document.getElementById(`major-status-${taskIndex}`);
+            if (statusSpan) statusSpan.outerHTML = `<span id="major-status-${taskIndex}">${window.getStatusBadge(task.status)}</span>`;
+            
+            window.syncDataToGoogleSheets();
+        }
+
+        window.openGanttEditModal = function(majorIndex, subIndex) {
+            window.currentEditingGantt = { majorIndex, subIndex };
+            var sub = window.sixMajorTasksData[majorIndex].subTasks[subIndex];
+            var bodyHtml = `<div class="mb-4"><p class="text-sm font-bold text-gray-700 bg-gray-100 p-2 rounded truncate" title="${sub.text}">${sub.text}</p></div><h5 class="text-xs font-bold text-emerald-700 mb-2 border-b pb-1"><i class="fa-solid fa-clock"></i> 執行排程設定</h5><div id="gantt-periods-container" class="space-y-2 max-h-[20vh] overflow-y-auto p-1 pr-2 mb-2">`;
+            sub.periods.forEach(function(p) { bodyHtml += window.generateGanttPeriodRow(p.start, p.end); });
+            bodyHtml += `</div><button onclick="window.addGanttPeriod()" class="w-full py-1.5 border border-dashed border-emerald-300 bg-emerald-50 rounded text-emerald-600 text-xs hover:bg-emerald-100 transition-colors mb-5"><i class="fa-solid fa-plus mr-1"></i>新增不連續排程區間</button>`;
+
+            var primary = (sub.members && sub.members.length > 0) ? sub.members[0] : '';
+            var coMembers = sub.members ? sub.members.slice(1) : [];
+            var primaryOptions = window.teamMembersData.map(function(m) { return `<option value="${m.name}" ${m.name === primary ? 'selected' : ''}>${m.name}</option>`; }).join('');
+            var coCheckboxes = window.teamMembersData.map(function(m) { return `<label class="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-colors bg-gray-50/50"><input type="checkbox" value="${m.name}" class="w-3.5 h-3.5 text-primary focus:ring-primary border-gray-300 rounded gantt-co-member" ${coMembers.includes(m.name) ? 'checked' : ''}><span class="text-[11px] font-medium text-gray-700">${m.name.slice(-2)}</span></label>`; }).join('');
+            
+            var otherPersonVal = '', vendorVal = '';
+            coMembers.forEach(function(m) { if (m.startsWith('其他人員：')) otherPersonVal = m.replace('其他人員：', ''); if (m.startsWith('委外廠商：')) vendorVal = m.replace('委外廠商：', ''); });
+
+            bodyHtml += `<div class="border-t border-gray-200 pt-4"><h5 class="text-xs font-bold text-blue-700 mb-3 border-b pb-1"><i class="fa-solid fa-users"></i> 指派同仁</h5><label class="block text-xs font-bold text-gray-700 mb-1">主要負責同仁 <span class="text-red-500">*</span></label><select id="gantt_primary" class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white custom-select mb-3">${primaryOptions}</select><label class="block text-xs font-bold text-gray-700 mb-1">協辦同仁 (可複選)</label><div class="grid grid-cols-3 sm:grid-cols-4 gap-1.5">${coCheckboxes}<div class="col-span-3 sm:col-span-4 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3"><div class="bg-gray-50/50 p-2 rounded border border-gray-200 flex flex-col justify-center"><label class="flex items-center gap-2 cursor-pointer mb-1"><input type="checkbox" id="gantt_check_other" ${otherPersonVal ? 'checked' : ''} onchange="document.getElementById('gantt_input_other').classList.toggle('hidden', !this.checked)"><span class="text-[11px] font-medium">其他人員</span></label><input type="text" id="gantt_input_other" class="w-full border border-gray-300 rounded px-2 py-1 text-xs ${otherPersonVal ? '' : 'hidden'}" placeholder="姓名" value="${otherPersonVal}"></div><div class="bg-gray-50/50 p-2 rounded border border-gray-200 flex flex-col justify-center"><label class="flex items-center gap-2 cursor-pointer mb-1"><input type="checkbox" id="gantt_check_vendor" ${vendorVal ? 'checked' : ''} onchange="document.getElementById('gantt_input_vendor').classList.toggle('hidden', !this.checked)"><span class="text-[11px] font-medium">委外廠商</span></label><input type="text" id="gantt_input_vendor" class="w-full border border-gray-300 rounded px-2 py-1 text-xs ${vendorVal ? '' : 'hidden'}" placeholder="廠商名稱" value="${vendorVal}"></div></div></div></div>`;
+            window.openCustomModal('編輯細部工作項目', '', 'info', bodyHtml, `<button onclick="window.closeModal()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">取消</button><button onclick="window.saveGanttPeriods()" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">儲存設定</button>`);
+        }
+
+        window.generateGanttPeriodRow = function(start, end) {
+            return `<div class="flex items-center gap-2 bg-white p-2 rounded border border-gray-200 shadow-sm gantt-period-row"><div class="flex-1"><input type="date" class="gantt-start border rounded px-2 py-1 text-xs w-full" value="${start}"></div><span class="text-gray-300">-</span><div class="flex-1"><input type="date" class="gantt-end border rounded px-2 py-1 text-xs w-full" value="${end}"></div><button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 p-1"><i class="fa-solid fa-trash-can"></i></button></div>`;
+        }
+
+        window.addGanttPeriod = function() { 
+            var c = document.getElementById('gantt-periods-container'); 
+            if (c) { c.insertAdjacentHTML('beforeend', window.generateGanttPeriodRow(window.defaultStartDate, window.defaultEndDate)); c.scrollTop = c.scrollHeight; }
+        }
+
+        window.saveGanttPeriods = function() {
+            var newPeriods = [];
+            document.querySelectorAll('.gantt-period-row').forEach(function(row) {
+                var s = row.querySelector('.gantt-start').value, e = row.querySelector('.gantt-end').value;
+                if (s && e && s <= e) newPeriods.push({ start: s, end: e });
+            });
+            if (newPeriods.length === 0) return window.openCustomModal('格式錯誤', '請至少保留一個有效的執行區間。', 'warning', '', `<button onclick="window.closeModal()" class="px-4 py-2 bg-amber-500 text-white rounded-lg">了解</button>`);
+
+            var primary = document.getElementById('gantt_primary').value;
+            var membersArray = [primary];
+            document.querySelectorAll('.gantt-co-member:checked').forEach(function(cb) { if (cb.value !== primary) membersArray.push(cb.value); });
+            if (document.getElementById('gantt_check_other').checked && document.getElementById('gantt_input_other').value.trim()) membersArray.push('其他人員：' + document.getElementById('gantt_input_other').value.trim());
+            if (document.getElementById('gantt_check_vendor').checked && document.getElementById('gantt_input_vendor').value.trim()) membersArray.push('委外廠商：' + document.getElementById('gantt_input_vendor').value.trim());
+
+            window.sixMajorTasksData[window.currentEditingGantt.majorIndex].subTasks[window.currentEditingGantt.subIndex].periods = newPeriods;
+            window.sixMajorTasksData[window.currentEditingGantt.majorIndex].subTasks[window.currentEditingGantt.subIndex].members = membersArray;
+
+            window.syncDataToGoogleSheets();
+            window.closeModal(); 
+            window.views['gantt'].render(document.getElementById('content-container'));
+        }
+
+        window.generateTaskFormHtml = function(mode, taskData = null) {
+            const isEdit = mode === 'edit';
+            const t = taskData || { type: '', name: '', startDate: window.defaultStartDate, endDate: window.defaultEndDate, members: [], isOngoing: false };
+            const typeOptions = window.taskTypes.map(type => `<option value="${type}" ${t.type === type ? 'selected' : ''}>${type}</option>`).join('');
+            let primary = t.members.length > 0 ? t.members[0] : '';
+            const primaryOptions = window.teamMembersData.map(m => `<option value="${m.name}" ${m.name === primary ? 'selected' : ''}>${m.name}</option>`).join('');
+            
+            let otherPersonVal = '', vendorVal = '';
+            t.members.slice(1).forEach(m => { 
+                if (m.startsWith('其他人員：')) otherPersonVal = m.replace('其他人員：', ''); 
+                if (m.startsWith('委外廠商：')) vendorVal = m.replace('委外廠商：', ''); 
+            });
+
+            return `<div class="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border p-6 md:p-8"><h3 class="text-lg font-bold text-gray-800 mb-6 border-b pb-4 flex items-center gap-2"><i class="fa-solid fa-clipboard-list text-primary"></i> ${isEdit ? '編輯' : '新增'}交辦事項</h3>
+                <form id="taskForm" onsubmit="window.handleTaskFormSubmit(event, '${isEdit ? t.id : ''}')">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div><label class="block text-sm font-medium text-gray-700 mb-2">交辦類型 <span class="text-red-500">*</span></label><select id="t_type" required class="w-full border rounded-lg px-4 py-2 custom-select">${typeOptions}</select></div>
+                        <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-2">交辦事項 <span class="text-red-500">*</span></label><input type="text" id="t_name" value="${t.name}" required class="w-full border rounded-lg px-4 py-2"></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-2">排程 (起始日期) <span class="text-red-500">*</span></label><input type="date" id="t_start" required value="${t.startDate}" class="w-full border rounded-lg px-4 py-2"></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-2">排程 (預計完成) <span class="text-red-500">*</span></label><input type="date" id="t_end" required value="${t.endDate}" class="w-full border rounded-lg px-4 py-2"></div>
+                        <div class="md:col-span-2"><label class="flex items-center gap-2 cursor-pointer p-3 bg-blue-50 border border-blue-200 rounded-lg w-fit shadow-sm"><input type="checkbox" id="t_is_ongoing" class="w-4 h-4 text-blue-600 rounded" ${t.isOngoing ? 'checked' : ''}><span class="text-sm font-bold text-blue-700">此為「持續進行」項目</span></label></div>
+                        <div class="col-span-1 md:col-span-2 bg-gray-50 p-5 rounded-lg border"><div class="mb-4 pb-4 border-b"><label class="block text-sm font-medium mb-2">主要負責同仁 <span class="text-red-500">*</span></label><select id="t_primary" required class="w-full md:w-1/2 border rounded-lg px-4 py-2 bg-white custom-select">${primaryOptions}</select></div>
+                            <label class="block text-sm font-medium mb-3">協辦同仁 (可複選)</label><div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-2">${window.teamMembersData.map(m => `<label class="flex items-center gap-2 cursor-pointer p-2 bg-white/50 border rounded shadow-sm"><input type="checkbox" value="${m.name}" class="w-4 h-4 text-primary rounded member-checkbox" ${t.members.slice(1).includes(m.name) ? 'checked' : ''}><span class="text-sm font-medium">${m.name.slice(-2)}</span></label>`).join('')}<div class="col-span-2 sm:col-span-4 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3"><div class="bg-white/50 p-3 rounded border flex flex-col justify-center"><label class="flex items-center gap-2 mb-1"><input type="checkbox" id="t_check_other" ${otherPersonVal ? 'checked' : ''} onchange="document.getElementById('t_input_other').classList.toggle('hidden', !this.checked)"><span class="text-sm font-medium">其他人員</span></label><input type="text" id="t_input_other" class="w-full border rounded px-3 py-1.5 text-sm ${otherPersonVal ? '' : 'hidden'}" value="${otherPersonVal}"></div><div class="bg-white/50 p-3 rounded border flex flex-col justify-center"><label class="flex items-center gap-2 mb-1"><input type="checkbox" id="t_check_vendor" ${vendorVal ? 'checked' : ''} onchange="document.getElementById('t_input_vendor').classList.toggle('hidden', !this.checked)"><span class="text-sm font-medium">委外廠商</span></label><input type="text" id="t_input_vendor" class="w-full border rounded px-3 py-1.5 text-sm ${vendorVal ? '' : 'hidden'}" value="${vendorVal}"></div></div></div></div></div>
+                    <div class="flex justify-end gap-4 mt-8 pt-6 border-t">${isEdit ? `<button type="button" onclick="window.closeModal()" class="px-6 py-2.5 border rounded-lg hover:bg-gray-50">取消</button>` : `<button type="button" onclick="window.switchView('tasks')" class="px-6 py-2.5 border rounded-lg hover:bg-gray-50">返回列表</button>`}<button type="submit" class="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-dark flex items-center gap-2"><i class="fa-solid fa-save"></i> 儲存交辦</button></div>
+                </form></div>`;
+        }
+
+        window.handleTaskFormSubmit = function(event, editId) {
+            event.preventDefault(); 
+            const primary = document.getElementById('t_primary').value;
+            let selectedMembers = [primary];
+            document.querySelectorAll('.member-checkbox:checked').forEach(cb => { if (cb.value !== primary) selectedMembers.push(cb.value); });
+            if (document.getElementById('t_check_other').checked && document.getElementById('t_input_other').value.trim()) selectedMembers.push('其他人員：' + document.getElementById('t_input_other').value.trim());
+            if (document.getElementById('t_check_vendor').checked && document.getElementById('t_input_vendor').value.trim()) selectedMembers.push('委外廠商：' + document.getElementById('t_input_vendor').value.trim());
+
+            const isOngoing = document.getElementById('t_is_ongoing').checked;
+            const taskObj = { type: document.getElementById('t_type').value, name: document.getElementById('t_name').value, startDate: document.getElementById('t_start').value, endDate: document.getElementById('t_end').value, members: selectedMembers, isOngoing: isOngoing };
+
+            if (editId) {
+                const idx = window.otherTasksData.findIndex(t => t.id === editId);
+                window.otherTasksData[idx] = { ...window.otherTasksData[idx], ...taskObj };
+                if (isOngoing) window.otherTasksData[idx].status = '進行中';
+            } else {
+                taskObj.id = 'T-' + String(window.otherTasksData.length + 1).padStart(3, '0');
+                taskObj.submitDate = window.getToday(); taskObj.progress = 0; taskObj.status = isOngoing ? '進行中' : '規劃中';
+                window.otherTasksData.unshift(taskObj);
+            }
+            window.syncDataToGoogleSheets();
+            window.closeModal(); 
+            if(!editId) window.openCustomModal('建立成功', `已新增交辦！`, 'success', '', `<button onclick="window.closeModal(); window.switchView('tasks');" class="px-6 py-2 bg-primary text-white rounded-lg">前往列表</button>`);
+            else window.views[window.currentView].render(document.getElementById('content-container'));
+        }
+
+        window.openEditOtherTaskModal = function(taskId) { 
+            window.openCustomModal('編輯交辦事項', '', 'info', window.generateTaskFormHtml('edit', window.otherTasksData.find(t => t.id === taskId)), ''); 
+        }
+
+        window.confirmDeleteOther = function(taskId) { 
+            window.openCustomModal('確認刪除', `確定要刪除：<br><strong>${window.otherTasksData.find(t=>t.id===taskId).name}</strong>？`, 'danger', '', `<button onclick="window.closeModal()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">取消</button><button onclick="window.executeDeleteOther('${taskId}')" class="px-4 py-2 bg-red-600 text-white rounded-lg">刪除</button>`); 
+        }
+        
+        window.executeDeleteOther = function(taskId) { 
+            window.otherTasksData.splice(window.otherTasksData.findIndex(t => t.id === taskId), 1); 
+            window.syncDataToGoogleSheets();
+            window.closeModal(); 
+            window.views[window.currentView].render(document.getElementById('content-container'));
+        }
+
+        window.openProgressModal = function(taskId) {
+            const data = window.otherTasksData.find(t => t.id === taskId);
+            window.openCustomModal('更新進度', `更新：<strong>${data.name}</strong>`, 'info', `<div class="mt-2"><label class="flex items-center justify-center gap-2 cursor-pointer mb-5 p-2.5 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200"><input type="checkbox" id="mod_is_ongoing" class="w-4 h-4 text-blue-600 rounded" ${data.isOngoing ? 'checked' : ''} onchange="document.getElementById('mod_progress_container').classList.toggle('opacity-40', this.checked); document.getElementById('mod_progress').disabled = this.checked;"><span class="text-sm font-bold text-blue-700">設為「持續進行」項目</span></label><div id="mod_progress_container" class="${data.isOngoing ? 'opacity-40' : ''}"><label class="block text-xs font-bold text-gray-700 mb-2 text-center">當前進度 (0-100%)</label><input type="number" id="mod_progress" min="0" max="100" value="${data.progress}" class="w-full border rounded-lg px-3 py-3 text-center text-2xl font-bold text-emerald-700" ${data.isOngoing ? 'disabled' : ''}></div></div>`, `<button onclick="window.closeModal()" class="px-4 py-2 bg-white border rounded-lg">取消</button><button onclick="window.executeProgressUpdate('${taskId}')" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">儲存</button>`);
+        }
+
+        window.executeProgressUpdate = function(taskId) {
+            const idx = window.otherTasksData.findIndex(t => t.id === taskId), isOngoing = document.getElementById('mod_is_ongoing').checked;
+            window.otherTasksData[idx].isOngoing = isOngoing;
+            if (isOngoing) { window.otherTasksData[idx].status = '進行中'; } 
+            else {
+                let val = parseInt(document.getElementById('mod_progress').value, 10);
+                if (isNaN(val) || val < 0 || val > 100) return window.openCustomModal('錯誤', '請輸入0-100的數字', 'warning', '', `<button onclick="window.closeModal()" class="px-4 py-2 bg-amber-500 text-white rounded">了解</button>`);
+                window.otherTasksData[idx].progress = val; window.otherTasksData[idx].status = val === 100 ? '已結案' : (val > 0 ? '進行中' : '規劃中');
+            }
+            window.syncDataToGoogleSheets();
+            window.closeModal(); 
+            window.views[window.currentView].render(document.getElementById('content-container'));
+        }
+
+        window.openEditMemberModal = function(idx) {
+            window.editingMemberIndex = idx;
+            let member = window.teamMembersData[idx];
+            let bodyHtml = `<div class="mt-4"><label class="block text-sm font-bold text-gray-700 mb-2">更新姓名 <span class="text-red-500">*</span></label><input type="text" id="edit_member_name" value="${member.name}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"></div>`;
+            window.openCustomModal('編輯同仁資訊', '修改同仁的姓名，這將會自動連動所有工項指派系統。', 'info', bodyHtml, `<button onclick="window.closeModal()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">取消</button><button onclick="window.executeEditMember()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">儲存變更</button>`);
+        }
+
+        window.executeEditMember = function() {
+            let newName = document.getElementById('edit_member_name').value.trim();
+            if (!newName) return;
+            let oldName = window.teamMembersData[window.editingMemberIndex].name;
+            window.teamMembersData[window.editingMemberIndex].name = newName;
+            window.sixMajorTasksData.forEach(task => task.subTasks.forEach(sub => { if (sub.members) sub.members = sub.members.map(m => m === oldName ? newName : m); }));
+            window.otherTasksData.forEach(task => { if (task.members) task.members = task.members.map(m => m === oldName ? newName : m); });
+            window.syncDataToGoogleSheets();
+            window.closeModal(); renderMemberTasks(document.getElementById('content-container'));
+        }
+
+        window.confirmRemoveMember = function(idx) {
+            window.removingMemberIndex = idx;
+            let member = window.teamMembersData[idx];
+            window.openCustomModal('確認移除同仁', `確定要把 <strong>${member.name}</strong> 移除嗎？<br><span class="text-red-500 text-xs mt-2 block">這會將該同仁從所有負責工項中抽離。</span>`, 'danger', '', `<button onclick="window.closeModal()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">取消</button><button onclick="window.executeRemoveMember()" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">確定移除</button>`);
+        }
+
+        window.executeRemoveMember = function() {
+            let oldName = window.teamMembersData[window.removingMemberIndex].name;
+            window.teamMembersData.splice(window.removingMemberIndex, 1);
+            window.sixMajorTasksData.forEach(task => task.subTasks.forEach(sub => { if (sub.members) sub.members = sub.members.filter(m => m !== oldName); }));
+            window.otherTasksData.forEach(task => { if (task.members) task.members = task.members.filter(m => m !== oldName); });
+            window.syncDataToGoogleSheets();
+            window.closeModal(); renderMemberTasks(document.getElementById('content-container'));
+        }
+
+        window.handleCardDragStart = function(event, type, index1, index2, originalOwner) {
+            window.draggedTaskInfo = { type, index1, index2, originalOwner };
+            event.dataTransfer.setData('text/plain', 'dragged-task');
+        }
+
+        window.handleCardDragOver = function(event) {
+            event.preventDefault();
+            const card = event.currentTarget;
+            card.classList.add('drag-target-hover');
+        }
+
+        window.handleCardDragLeave = function(event) {
+            const card = event.currentTarget;
+            card.classList.remove('drag-target-hover');
+        }
+
+        window.handleCardDrop = function(event, targetMemberName) {
+            event.preventDefault();
+            const card = event.currentTarget;
+            card.classList.remove('drag-target-hover');
+
+            if (!window.draggedTaskInfo) return;
+            const { type, index1, index2, originalOwner } = window.draggedTaskInfo;
+            if (originalOwner === targetMemberName) return;
+
+            if (type === 'major') {
+                let sub = window.sixMajorTasksData[index1].subTasks[index2];
+                let members = sub.members ? [...sub.members] : [];
+                members = members.filter(m => m !== targetMemberName);
+                members.unshift(targetMemberName);
+                sub.members = members;
+            } else if (type === 'other') {
+                let task = window.otherTasksData[index1];
+                let members = task.members ? [...task.members] : [];
+                members = members.filter(m => m !== targetMemberName);
+                members.unshift(targetMemberName);
+                task.members = members;
+            }
+            window.draggedTaskInfo = null;
+            window.syncDataToGoogleSheets();
+            renderMemberTasks(document.getElementById('content-container'));
+        }
+
+        window.openAddMemberModal = function() {
+            let bodyHtml = `<div class="mt-4"><label class="block text-sm font-bold text-gray-700 mb-2">同仁姓名 <span class="text-red-500">*</span></label><input type="text" id="new_member_name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none" placeholder="例如：林小明"></div>`;
+            let actionsHtml = `<button onclick="window.closeModal()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">取消</button><button onclick="window.executeAddMember()" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">新增同仁</button>`;
+            window.openCustomModal('新增專案辦公室同仁', '請輸入新進人員姓名。系統會自動指派色彩與後兩字之簡稱圖貼。', 'info', bodyHtml, actionsHtml);
+            setTimeout(() => document.getElementById('new_member_name').focus(), 150);
+        }
+
+        window.executeAddMember = function() {
+            let name = document.getElementById('new_member_name').value.trim();
+            if (!name) return;
+            if (window.teamMembersData.some(m => m.name === name)) {
+                return window.openCustomModal('同仁已存在', '系統中已有相同姓名的同仁，請加上區別字。', 'warning', '', `<button onclick="window.closeModal()" class="px-4 py-2 bg-amber-500 text-white rounded-lg">了解</button>`);
+            }
+            let randomColor = window.colorPalette[Math.floor(Math.random() * window.colorPalette.length)];
+            window.teamMembersData.push({ name: name, color: randomColor });
+            window.syncDataToGoogleSheets();
+            window.closeModal();
+            renderMemberTasks(document.getElementById('content-container'));
+        }
+
+        // ==========================================
+        // 7. 拖曳排序初始化 (防無限迴圈安全版)
+        // ==========================================
+        window.sortableRetryCount = 0;
+        window.initSortable = function() {
+            const el = document.getElementById('sortable-task-list');
+            if (el && typeof Sortable !== 'undefined') {
+                new Sortable(el, {
+                    animation: 150, ghostClass: 'bg-emerald-50', handle: '.cursor-move',
+                    onEnd: function () {
+                        const activeFilter = t => (t.progress < 100 && !t.isOngoing);
+                        window.reorderTasksByDOM(el, activeFilter);
+                    }
+                });
+            } else if (el && window.sortableRetryCount < 10) { 
+                window.sortableRetryCount++;
+                setTimeout(window.initSortable, 500); 
+            }
+        }
+
+        window.sortableCompletedRetryCount = 0;
+        window.initSortableCompleted = function() {
+            const el = document.getElementById('sortable-completed-list');
+            if (el && typeof Sortable !== 'undefined') {
+                new Sortable(el, {
+                    animation: 150, ghostClass: 'bg-emerald-50', handle: '.cursor-move',
+                    onEnd: function () {
+                        const completedFilter = t => (t.progress === 100 && !t.isOngoing);
+                        window.reorderTasksByDOM(el, completedFilter);
+                    }
+                });
+            } else if (el && window.sortableCompletedRetryCount < 10) { 
+                window.sortableCompletedRetryCount++;
+                setTimeout(window.initSortableCompleted, 500); 
+            }
+        }
+
+        window.exportCompletedToExcel = function() {
+            const completedTasks = window.otherTasksData.filter(t => t.progress === 100 && !t.isOngoing);
+            if (completedTasks.length === 0) return window.openCustomModal('提示', '目前尚無已結案事項可供匯出。', 'info', '', `<button onclick="window.closeModal()" class="px-4 py-2 bg-blue-500 text-white rounded">了解</button>`);
+            let tableHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body><table border="1"><tr style="background-color:#059669;color:white;"><th>序</th><th>提交日期</th><th>交辦類型</th><th>交辦事項</th></tr>`;
+            completedTasks.forEach((t, i) => { tableHtml += `<tr><td>${i + 1}</td><td>${t.submitDate}</td><td>${t.type}</td><td>${t.name}</td></tr>`; });
+            tableHtml += `</table></body></html>`;
+            const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel' });
+            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `已結案交辦清單_${window.getToday()}.xls`;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        // ==========================================
+        // 8. 視圖路由器配置與全域切換
+        // ==========================================
+        window.views = {
+            'dashboard': { title: '六大工項儀表板', render: renderDashboard },
+            'gantt': { title: '細部工作項目甘特圖', render: renderGantt },
+            'member-tasks': { title: '同仁負責工項', render: renderMemberTasks },
+            'tasks': { title: '交辦事項列表', render: renderOtherTasks },
+            'add-task': { title: '新增交辦', render: renderAddOtherTask },
+            'completed-tasks': { title: '已結案交辦', render: renderCompletedTasks },
+            'export-tasks': { title: '匯出報表編輯', render: renderExportTasks }
+        };
+
+        window.switchView = function(viewName) {
+            try {
+                window.currentView = viewName;
+                document.getElementById('page-title').innerText = window.views[viewName].title;
+                document.querySelectorAll('.nav-item').forEach(el => { el.classList.replace('bg-primary', 'text-gray-300'); el.classList.replace('text-white', 'text-gray-300'); });
+                const activeNav = document.getElementById(`nav-${viewName}`);
+                if (activeNav) { activeNav.classList.replace('text-gray-300', 'bg-primary'); activeNav.classList.add('text-white'); }
+                const container = document.getElementById('content-container');
+                container.innerHTML = ''; container.classList.remove('fade-in'); void container.offsetWidth; container.classList.add('fade-in');
+                window.views[viewName].render(container);
+                if (window.innerWidth < 1024 && !document.getElementById('sidebar').classList.contains('-translate-x-full')) window.toggleMobileMenu();
+            } catch (err) {
+                const el = document.getElementById('error-log');
+                if(el){ el.classList.remove('hidden'); el.innerHTML += "切換視圖失敗: " + err.message + "<br>"; }
+            }
+        }
+
+        window.toggleMobileMenu = function() { 
+            document.getElementById('sidebar').classList.toggle('-translate-x-full'); 
+            document.getElementById('mobile-overlay').classList.toggle('hidden'); 
+        };
+
+        window.initApp = function() {
+            try {
+                window.switchView('dashboard');
+            } catch (e) { console.error(e); }
+        }
+
+        // ==========================================
+        // 9. 系統啟動
+        // ==========================================
+        if (document.readyState === 'loading') { 
+            window.addEventListener('DOMContentLoaded', initGoogleSheetsDB); 
+        } else { 
+            initGoogleSheetsDB(); 
+        }
+    </script>
+</body>
+</html>
